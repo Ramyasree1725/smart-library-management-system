@@ -1,0 +1,2324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>📚 Smart Library Management System - Student, Employee & Admin Workflow</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0fdf4',
+              100: '#dcfce7',
+              500: '#22c55e',
+              600: '#16a34a',
+              700: '#15803d',
+              800: '#166534',
+              900: '#14532d',
+            },
+            admin: {
+              500: '#3b82f6',
+              600: '#2563eb',
+              700: '#1d4ed8'
+            },
+            staff: {
+              500: '#f59e0b',
+              600: '#d97706',
+              700: '#b45309'
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- React 18 & Babel Standalone CDN -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <!-- Canvas Confetti & Lucide Icons -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- QRCode JS CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap');
+    
+    * {
+      font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.6);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(100, 116, 139, 0.4);
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(100, 116, 139, 0.7);
+    }
+
+    @keyframes fadeOutDisappear {
+      0% { opacity: 1; transform: scale(1); max-height: 140px; margin-bottom: 12px; }
+      50% { opacity: 0.3; transform: scale(0.95); }
+      100% { opacity: 0; transform: scale(0.85); max-height: 0px; margin-bottom: 0px; padding: 0px; }
+    }
+
+    .disappearing-item {
+      animation: fadeOutDisappear 0.5s ease-out forwards;
+      overflow: hidden;
+    }
+
+    @keyframes qrLaser {
+      0% { top: 0%; opacity: 0.8; }
+      50% { top: 92%; opacity: 1; }
+      100% { top: 0%; opacity: 0.8; }
+    }
+    .qr-laser-line {
+      position: absolute;
+      left: 0;
+      width: 100%;
+      height: 4px;
+      background: linear-gradient(90deg, transparent, #22c55e, #86efac, #22c55e, transparent);
+      box-shadow: 0 0 15px #22c55e, 0 0 25px #4ade80;
+      animation: qrLaser 1.8s infinite ease-in-out;
+    }
+  </style>
+</head>
+<body class="bg-[#090e1a] text-slate-100 min-h-screen antialiased selection:bg-emerald-500 selection:text-white">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo, useRef } = React;
+
+    // Web Audio Chime Sound
+    const playSuccessChime = () => {
+      try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (AudioContext) {
+          const ctx = new AudioContext();
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(587.33, ctx.currentTime);
+          osc.frequency.setValueAtTime(880, ctx.currentTime + 0.1);
+          gain.gain.setValueAtTime(0.2, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start();
+          osc.stop(ctx.currentTime + 0.35);
+        }
+      } catch (e) {}
+    };
+
+    // --- BOOKS CATALOG ACROSS ALL REQUESTED CATEGORIES ---
+    const INITIAL_CATALOG = [
+      // GOVERNMENT JOBS
+      { id: 'b-101', title: 'Indian Polity for UPSC & State PSC (6th Edition)', author: 'M. Laxmikanth', category: 'Government Jobs', copies: 6, availableCopies: 4, shelf: 'Rack GJ-01 (Floor 1)', shelfStatus: 'Arranged', cover: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=400&auto=format&fit=crop&q=80', description: 'The absolute standard for UPSC Civil Services, APPSC, TSPSC and State PSC preparation. Covers constitution, governance, and judicial reforms.' },
+      { id: 'b-102', title: 'Quantitative Aptitude for Competitive Examinations', author: 'Dr. R.S. Aggarwal', category: 'Government Jobs', copies: 8, availableCopies: 1, shelf: 'Rack GJ-02 (Floor 1)', shelfStatus: 'Arranged', cover: 'https://images.unsplash.com/photo-1509228468518-180dd4864904?w=400&auto=format&fit=crop&q=80', description: 'Essential mathematics and problem solving for Banking (IBPS, SBI PO), SSC CGL, Railways RRB, and campus placements.' },
+      { id: 'b-103', title: 'A Modern Approach to Verbal & Non-Verbal Reasoning', author: 'Dr. R.S. Aggarwal', category: 'Government Jobs', copies: 5, availableCopies: 2, shelf: 'Rack GJ-03 (Floor 1)', shelfStatus: 'Needs Rearranging', cover: 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=400&auto=format&fit=crop&q=80', description: 'Comprehensive logical reasoning guide covering analytical puzzles, syllogisms, and series for competitive exams.' },
+      { id: 'b-104', title: 'General Studies Paper 1 Manual for Civil Services', author: 'McGraw Hill / Rajiv Ahir', category: 'Government Jobs', copies: 4, availableCopies: 0, shelf: 'Rack GJ-04 (Floor 1)', shelfStatus: 'Arranged', cover: 'https://images.unsplash.com/photo-1461360370896-922624d12aa1?w=400&auto=format&fit=crop&q=80', description: 'Complete Indian history, geography, environment, and economy preparation module for UPSC aspirants.' },
+
+      // CURRENT AFFAIRS
+      { id: 'b-201', title: 'Manorama Yearbook 2026: Comprehensive General Knowledge', author: 'Mammen Mathew', category: 'Current Affairs', copies: 10, availableCopies: 7, shelf: 'Rack CA-01 (Floor 1)', shelfStatus: 'Arranged', cover: 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=400&auto=format&fit=crop&q=80', description: 'Up-to-date global affairs, science achievements, national summits, awards, sports, and international diplomacy review.' },
+      { id: 'b-202', title: 'India 2026: Annual Reference Manual', author: 'Publications Division, Govt of India', category: 'Current Affairs', copies: 6, availableCopies: 4, shelf: 'Rack CA-02 (Floor 1)', shelfStatus: 'Arranged', cover: 'https://images.unsplash.com/photo-1526470608268-f674ce90ebd4?w=400&auto=format&fit=crop&q=80', description: 'Official government compilation of national welfare schemes, ministries, economic data, and census indicators.' },
+      { id: 'b-203', title: 'Pratiyogita Darpan: Monthly Current Affairs & Policy Round', author: 'Editorial Board', category: 'Current Affairs', copies: 7, availableCopies: 0, shelf: 'Rack CA-03 (Floor 1)', shelfStatus: 'Needs Rearranging', cover: 'https://images.unsplash.com/photo-1495020689067-958852a7765e?w=400&auto=format&fit=crop&q=80', description: 'Monthly analytical magazine highlighting national economic developments, science breakthroughs, and interview preparation.' },
+
+      // EDUCATION
+      { id: 'b-301', title: 'Clean Code: A Handbook of Agile Software Craftsmanship', author: 'Robert C. Martin', category: 'Education', copies: 7, availableCopies: 4, shelf: 'Rack ED-01 (Floor 2)', shelfStatus: 'Arranged', cover: 'https://images.unsplash.com/photo-1516259762381-22954d7d3ad2?w=400&auto=format&fit=crop&q=80', description: 'Standard software engineering text on writing readable, reusable, clean and bug-free code.' },
+      { id: 'b-302', title: 'Introduction to Algorithms (CLRS)', author: 'Thomas H. Cormen, Charles E. Leiserson', category: 'Education', copies: 8, availableCopies: 3, shelf: 'Rack ED-02 (Floor 2)', shelfStatus: 'Arranged', cover: 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=400&auto=format&fit=crop&q=80', description: 'The golden standard textbook for Data Structures, Graph Theory, Dynamic Programming and Algorithms.' },
+      { id: 'b-303', title: 'Artificial Intelligence: A Modern Approach', author: 'Stuart Russell & Peter Norvig', category: 'Education', copies: 6, availableCopies: 4, shelf: 'Rack ED-03 (Floor 2)', shelfStatus: 'Needs Rearranging', cover: 'https://images.unsplash.com/photo-1620712943543-bcc4688e7485?w=400&auto=format&fit=crop&q=80', description: 'Comprehensive university text on intelligent agents, neural networks, machine learning and robotics.' },
+
+      // STORIES & NOVELS
+      { id: 'b-401', title: 'Atomic Habits: Tiny Changes, Remarkable Results', author: 'James Clear', category: 'Stories & Novels', copies: 9, availableCopies: 5, shelf: 'Rack ST-01 (Floor 2)', shelfStatus: 'Arranged', cover: 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=400&auto=format&fit=crop&q=80', description: 'Inspiring real-life stories and practical behavioral framework on how small 1% habits lead to massive success.' },
+      { id: 'b-402', title: 'The Alchemist', author: 'Paulo Coelho', category: 'Stories & Novels', copies: 8, availableCopies: 5, shelf: 'Rack ST-02 (Floor 2)', shelfStatus: 'Arranged', cover: 'https://images.unsplash.com/photo-1476275466078-4007374efbbe?w=400&auto=format&fit=crop&q=80', description: 'The magical story of Santiago, an Andalusian shepherd boy who journeys to the Egyptian pyramids in search of treasure.' },
+      { id: 'b-403', title: 'Barrister Parvateesam (బారిస్టర్ పార్వతీశం)', author: 'Mokkapati Narasimha Sastry', category: 'Stories & Novels', copies: 5, availableCopies: 3, shelf: 'Rack ST-03 (Floor 2)', shelfStatus: 'Needs Rearranging', cover: 'https://images.unsplash.com/photo-1512820790803-83ca734da794?w=400&auto=format&fit=crop&q=80', description: 'Classic humorous Telugu literary novel detailing the adventurous and witty journey of Parvateesam to England.' }
+    ];
+
+    function App() {
+      // --- AUTH STATE ---
+      const [isAuthenticated, setIsAuthenticated] = useState(() => {
+        const saved = localStorage.getItem('smart_lib_auth_state_v7');
+        return saved ? JSON.parse(saved) : true;
+      });
+
+      const [authMode, setAuthMode] = useState('login');
+      const [loginRoleTab, setLoginRoleTab] = useState('student');
+
+      // Current Logged-in User
+      const [currentUser, setCurrentUser] = useState(() => {
+        const saved = localStorage.getItem('smart_lib_user_profile_v7');
+        return saved ? JSON.parse(saved) : {
+          role: 'student',
+          name: 'Ramya Sri',
+          id: '2026-CS-042',
+          title: 'Student Member',
+          email: 'ramya.sri@college.edu'
+        };
+      });
+
+      // Active Tab
+      const [activeTab, setActiveTab] = useState('student_scanner');
+
+      // Books Catalog
+      const [books, setBooks] = useState(() => {
+        const saved = localStorage.getItem('smart_lib_catalog_v7');
+        return saved ? JSON.parse(saved) : INITIAL_CATALOG;
+      });
+
+      // Student Borrow Requests Queue
+      const [requests, setRequests] = useState(() => {
+        const saved = localStorage.getItem('smart_lib_requests_v7');
+        return saved ? JSON.parse(saved) : [
+          {
+            id: 'req-1',
+            studentName: 'Ramya Sri',
+            studentRoll: '2026-CS-042',
+            bookId: 'b-101',
+            bookTitle: 'Indian Polity (6th Edition)',
+            author: 'M. Laxmikanth',
+            requestedAt: 'Today, 10:15 AM',
+            status: 'pending'
+          }
+        ];
+      });
+
+      // Employee Restock Requests Queue to Admin
+      // [{ id, bookId, bookTitle, author, category, requestedBy, empId, requestedAt, addedCopies: 5, status: 'pending' | 'restocked' }]
+      const [restockRequests, setRestockRequests] = useState(() => {
+        const saved = localStorage.getItem('smart_lib_restock_requests_v7');
+        return saved ? JSON.parse(saved) : [
+          {
+            id: 'rstk-101',
+            bookId: 'b-104',
+            bookTitle: 'General Studies Paper 1 Manual for Civil Services',
+            author: 'McGraw Hill',
+            category: 'Government Jobs',
+            requestedBy: 'Suresh Kumar',
+            empId: 'LIB-EMP-108',
+            requestedAt: 'Today, 11:05 AM',
+            addedCopies: 5,
+            status: 'pending'
+          }
+        ];
+      });
+
+      // Active Loans (2 Days rule)
+      const [activeLoans, setActiveLoans] = useState(() => {
+        const saved = localStorage.getItem('smart_lib_loans_v7');
+        return saved ? JSON.parse(saved) : [
+          {
+            id: 'loan-1',
+            bookId: 'b-401',
+            bookTitle: 'Atomic Habits',
+            author: 'James Clear',
+            borrowDate: '2026-09-01',
+            dueDate: '2026-09-03',
+            allowedDays: 2,
+            studentName: 'Ramya Sri',
+            studentRoll: '2026-CS-042',
+            status: 'Active'
+          }
+        ];
+      });
+
+      // Student Attendance Logs
+      const [attendanceLogs, setAttendanceLogs] = useState(() => {
+        const saved = localStorage.getItem('smart_lib_attendance_v7');
+        return saved ? JSON.parse(saved) : [
+          { id: 'att-101', studentName: 'Ramya Sri', studentRoll: '2026-CS-042', type: 'CHECK-IN', time: '09:15 AM', date: '2026-09-04', status: 'Inside Library' }
+        ];
+      });
+
+      // Employee / Staff Attendance Logs
+      // [{ id, empName, empId, designation, type: 'DUTY CHECK-IN' | 'DUTY CHECK-OUT', time: string, date: string, shift: 'Morning Shift (9 AM - 5 PM)' }]
+      const [employeeAttendanceLogs, setEmployeeAttendanceLogs] = useState(() => {
+        const saved = localStorage.getItem('smart_lib_emp_attendance_v7');
+        return saved ? JSON.parse(saved) : [
+          { id: 'emp-att-1', empName: 'Suresh Kumar', empId: 'LIB-EMP-108', designation: 'Library Assistant', type: 'DUTY CHECK-IN', time: '08:55 AM', date: '2026-09-04', shift: 'Morning Shift (9 AM - 5 PM)' }
+        ];
+      });
+
+      const [isStudentInside, setIsStudentInside] = useState(() => {
+        const saved = localStorage.getItem('smart_lib_is_inside_v7');
+        return saved !== null ? JSON.parse(saved) : true;
+      });
+
+      // Scanner State Machine
+      const [isScannerModalOpen, setIsScannerModalOpen] = useState(false);
+      const [scannerActionType, setScannerActionType] = useState('CHECK-IN');
+      const [scanState, setScanState] = useState('IDLE_WAITING_SCAN');
+      const [scanSuccessEvent, setScanSuccessEvent] = useState(null);
+
+      // Filters & Messages
+      const [selectedCategory, setSelectedCategory] = useState('ALL');
+      const [searchQuery, setSearchQuery] = useState('');
+      const [toastMsg, setToastMsg] = useState(null);
+      const [disappearingReqId, setDisappearingReqId] = useState(null);
+      const [disappearingRestockId, setDisappearingRestockId] = useState(null);
+
+      // Persistence
+      useEffect(() => {
+        localStorage.setItem('smart_lib_auth_state_v7', JSON.stringify(isAuthenticated));
+      }, [isAuthenticated]);
+      useEffect(() => {
+        localStorage.setItem('smart_lib_user_profile_v7', JSON.stringify(currentUser));
+      }, [currentUser]);
+      useEffect(() => {
+        localStorage.setItem('smart_lib_catalog_v7', JSON.stringify(books));
+      }, [books]);
+      useEffect(() => {
+        localStorage.setItem('smart_lib_requests_v7', JSON.stringify(requests));
+      }, [requests]);
+      useEffect(() => {
+        localStorage.setItem('smart_lib_restock_requests_v7', JSON.stringify(restockRequests));
+      }, [restockRequests]);
+      useEffect(() => {
+        localStorage.setItem('smart_lib_loans_v7', JSON.stringify(activeLoans));
+      }, [activeLoans]);
+      useEffect(() => {
+        localStorage.setItem('smart_lib_attendance_v7', JSON.stringify(attendanceLogs));
+      }, [attendanceLogs]);
+      useEffect(() => {
+        localStorage.setItem('smart_lib_emp_attendance_v7', JSON.stringify(employeeAttendanceLogs));
+      }, [employeeAttendanceLogs]);
+      useEffect(() => {
+        localStorage.setItem('smart_lib_is_inside_v7', JSON.stringify(isStudentInside));
+      }, [isStudentInside]);
+
+      // Lucide Icons
+      useEffect(() => {
+        if (window.lucide) {
+          window.lucide.createIcons();
+        }
+      });
+
+      const showToast = (message, type = 'success') => {
+        setToastMsg({ text: message, type });
+        setTimeout(() => setToastMsg(null), 3800);
+      };
+
+      const categories = ['ALL', 'Education', 'Current Affairs', 'Government Jobs', 'Stories & Novels'];
+
+      const filteredBooks = useMemo(() => {
+        return books.filter(b => {
+          const matchCat = selectedCategory === 'ALL' || b.category === selectedCategory;
+          const matchQ = !searchQuery || 
+            b.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+            b.author.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            b.category.toLowerCase().includes(searchQuery.toLowerCase());
+          return matchCat && matchQ;
+        });
+      }, [books, selectedCategory, searchQuery]);
+
+      // Fine Engine
+      const calculateFine = (borrowDateStr) => {
+        const borrowDate = new Date(borrowDateStr);
+        const today = new Date('2026-09-04');
+        const diffTime = Math.max(0, today - borrowDate);
+        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+        
+        if (diffDays > 2) {
+          const overdueDays = diffDays - 2;
+          return { fine: overdueDays * 20, overdueDays, isOverdue: true };
+        }
+        return { fine: 0, overdueDays: 0, isOverdue: false };
+      };
+
+      const totalStudentFine = useMemo(() => {
+        return activeLoans.reduce((sum, loan) => {
+          const { fine } = calculateFine(loan.borrowDate);
+          return sum + fine;
+        }, 0);
+      }, [activeLoans]);
+
+      const pendingBorrowRequestsCount = requests.filter(r => r.status === 'pending').length;
+      const pendingRestockRequestsCount = restockRequests.filter(r => r.status === 'pending').length;
+      const totalAdminNotifications = pendingBorrowRequestsCount + pendingRestockRequestsCount;
+
+      // Switch Role Quick Handler
+      const handleRoleSwitch = (role) => {
+        if (role === 'student') {
+          setCurrentUser({ role: 'student', name: 'Ramya Sri', id: '2026-CS-042', title: 'Student Member', email: 'ramya.sri@college.edu' });
+          setActiveTab('student_scanner');
+          showToast('Switched to Student Portal');
+        } else if (role === 'employee') {
+          setCurrentUser({ role: 'employee', name: 'Suresh Kumar', id: 'LIB-EMP-108', title: 'Library Assistant & Staff', email: 'suresh.staff@library.edu' });
+          setActiveTab('emp_restock_audit');
+          showToast('Switched to Library Employee Portal 👷');
+        } else {
+          setCurrentUser({ role: 'admin', name: 'Dr. Ramesh Sharma', id: 'LIB-ADM-001', title: 'Chief Librarian / Admin', email: 'admin@library.edu' });
+          setActiveTab('admin_restock_requests');
+          showToast('Switched to Chief Librarian Admin Portal 🛡️');
+        }
+      };
+
+      // --- AUTH SUBMIT ---
+      const handleAuthSubmit = (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        const name = fd.get('name') || (loginRoleTab === 'student' ? 'Ramya Sri' : loginRoleTab === 'employee' ? 'Suresh Kumar' : 'Dr. Ramesh Sharma');
+        const idNumber = fd.get('idNumber') || (loginRoleTab === 'student' ? '2026-CS-042' : loginRoleTab === 'employee' ? 'LIB-EMP-108' : 'LIB-ADM-001');
+        const role = fd.get('role') || loginRoleTab;
+
+        setCurrentUser({
+          role,
+          name,
+          id: idNumber,
+          title: role === 'employee' ? 'Library Assistant & Staff' : role === 'admin' ? 'Chief Librarian' : 'Student Member',
+          email: fd.get('email') || `${name.toLowerCase().replace(/\s+/g, '')}@library.edu`
+        });
+
+        setIsAuthenticated(true);
+        if (role === 'employee') setActiveTab('emp_restock_audit');
+        else if (role === 'admin') setActiveTab('admin_restock_requests');
+        else setActiveTab('student_scanner');
+
+        showToast(`🎉 Logged in successfully as ${name} (${role.toUpperCase()})`);
+        if (window.confetti) window.confetti({ particleCount: 60, spread: 60 });
+      };
+
+      // --- SCANNER MODAL CONTROLS ---
+      const openScanner = (type) => {
+        setScannerActionType(type);
+        setScanState('IDLE_WAITING_SCAN');
+        setIsScannerModalOpen(true);
+      };
+
+      const closeScanner = () => {
+        setIsScannerModalOpen(false);
+        setScanState('IDLE_WAITING_SCAN');
+      };
+
+      const handleTriggerPhoneScan = () => {
+        playSuccessChime();
+        setScanState('SCAN_DETECTED');
+        showToast('📱 Phone Scan Detected! Verifying Student ID...');
+      };
+
+      const handleCompleteScanDone = () => {
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        const dateStr = now.toISOString().split('T')[0];
+
+        const isCheckIn = scannerActionType === 'CHECK-IN';
+        setIsStudentInside(isCheckIn);
+
+        const newAttendanceEntry = {
+          id: 'att-' + Date.now(),
+          studentName: currentUser.name,
+          studentRoll: currentUser.id,
+          type: isCheckIn ? 'CHECK-IN' : 'CHECK-OUT',
+          time: timeStr,
+          date: dateStr,
+          status: isCheckIn ? 'Inside Library' : 'Checked Out'
+        };
+
+        setAttendanceLogs(prev => [newAttendanceEntry, ...prev]);
+
+        setScanSuccessEvent({
+          type: isCheckIn ? 'CHECK-IN' : 'CHECK-OUT',
+          name: currentUser.name,
+          roll: currentUser.id,
+          time: timeStr,
+          date: dateStr
+        });
+
+        closeScanner();
+        if (window.confetti) window.confetti({ particleCount: 80, spread: 70 });
+      };
+
+      // Render Clean High-Res QR Code (Option A)
+      useEffect(() => {
+        const container = document.getElementById('phone-scan-qrcode-only');
+        if (container) {
+          container.innerHTML = '';
+          if (window.QRCode) {
+            new QRCode(container, {
+              text: `GATE_${scannerActionType}_${currentUser.name.replace(/\s+/g, '_')}_${currentUser.id}_${Date.now()}`,
+              width: 180,
+              height: 180,
+              colorDark: '#090e1a',
+              colorLight: '#ffffff',
+              correctLevel: QRCode.CorrectLevel.H
+            });
+          }
+        }
+      }, [isScannerModalOpen, scannerActionType]);
+
+      // --- EMPLOYEE DUTY ATTENDANCE ACTION ---
+      const handleEmployeeDutyAttendance = (type) => {
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        const dateStr = now.toISOString().split('T')[0];
+
+        const newEmpLog = {
+          id: 'emp-att-' + Date.now(),
+          empName: currentUser.name,
+          empId: currentUser.id,
+          designation: 'Library Assistant',
+          type,
+          time: timeStr,
+          date: dateStr,
+          shift: 'Morning Shift (9 AM - 5 PM)'
+        };
+
+        setEmployeeAttendanceLogs(prev => [newEmpLog, ...prev]);
+        showToast(`👷 ${type} marked at ${timeStr}! Saved to Admin Duty Registry.`);
+        if (window.confetti) window.confetti({ particleCount: 50, spread: 50 });
+      };
+
+      // --- EMPLOYEE SENDS RESTOCK REQUEST TO ADMIN ---
+      const handleEmployeeSendRestockRequest = (book) => {
+        const isAlreadyRequested = restockRequests.some(r => r.bookId === book.id && r.status === 'pending');
+        if (isAlreadyRequested) {
+          showToast(`⚠️ Restock request for "${book.title}" is already sent to Admin!`, 'info');
+          return;
+        }
+
+        const newRestockReq = {
+          id: 'rstk-' + Date.now(),
+          bookId: book.id,
+          bookTitle: book.title,
+          author: book.author,
+          category: book.category,
+          requestedBy: currentUser.name,
+          empId: currentUser.id,
+          requestedAt: 'Just now',
+          addedCopies: 5,
+          status: 'pending'
+        };
+
+        setRestockRequests(prev => [newRestockReq, ...prev]);
+        showToast(`🔔 Restock notification sent to Admin for "${book.title}"! (+5 Copies Requested)`);
+        playSuccessChime();
+      };
+
+      // --- ADMIN APPROVES & RESTOCKS STOCK (DISAPPEARS & INCREMENTS) ---
+      const handleAdminExecuteRestock = (req) => {
+        setDisappearingRestockId(req.id);
+
+        setTimeout(() => {
+          // Increment book stock by 5 copies
+          setBooks(prev => prev.map(b => {
+            if (b.id === req.bookId) {
+              return {
+                ...b,
+                copies: b.copies + req.addedCopies,
+                availableCopies: b.availableCopies + req.addedCopies,
+                shelfStatus: 'Arranged'
+              };
+            }
+            return b;
+          }));
+
+          // Remove from restock requests (Disappears!)
+          setRestockRequests(prev => prev.filter(r => r.id !== req.id));
+          setDisappearingRestockId(null);
+          showToast(`📦 Restocked +${req.addedCopies} copies for "${req.bookTitle}"! Stock is now live.`);
+
+          if (window.confetti) {
+            window.confetti({ particleCount: 75, spread: 65, origin: { y: 0.5 } });
+          }
+        }, 400);
+      };
+
+      // --- STUDENT BORROW REQUEST ACTIONS ---
+      const handleSendBorrowRequest = (book) => {
+        if (!isStudentInside) {
+          showToast('⚠️ Please scan Check-In at the gate before requesting books!', 'error');
+          return;
+        }
+        if (book.availableCopies <= 0) {
+          showToast(`❌ "${book.title}" is out of stock! Staff will request Admin to restock.`, 'error');
+          return;
+        }
+        const alreadyReq = requests.some(r => r.bookId === book.id && r.status === 'pending');
+        if (alreadyReq) {
+          showToast(`⚠️ Request for "${book.title}" is already pending approval!`, 'info');
+          return;
+        }
+
+        const newReq = {
+          id: 'req-' + Date.now(),
+          studentName: currentUser.name,
+          studentRoll: currentUser.id,
+          bookId: book.id,
+          bookTitle: book.title,
+          author: book.author,
+          requestedAt: 'Just now',
+          status: 'pending'
+        };
+
+        setRequests(prev => [newReq, ...prev]);
+        showToast(`📨 Borrow request for "${book.title}" sent to Admin!`);
+      };
+
+      const handleAdminApprove = (req) => {
+        setDisappearingReqId(req.id);
+        setTimeout(() => {
+          setBooks(prev => prev.map(b => b.id === req.bookId ? { ...b, availableCopies: Math.max(0, b.availableCopies - 1) } : b));
+          setRequests(prev => prev.filter(r => r.id !== req.id));
+
+          const today = new Date();
+          const dueDate = new Date();
+          dueDate.setDate(today.getDate() + 2);
+
+          const newLoan = {
+            id: 'loan-' + Date.now(),
+            bookId: req.bookId,
+            bookTitle: req.bookTitle,
+            author: req.author,
+            borrowDate: today.toISOString().split('T')[0],
+            dueDate: dueDate.toISOString().split('T')[0],
+            allowedDays: 2,
+            studentName: req.studentName,
+            studentRoll: req.studentRoll,
+            status: 'Approved & Issued'
+          };
+
+          setActiveLoans(prev => [newLoan, ...prev]);
+          setDisappearingReqId(null);
+          showToast(`✅ Approved request for "${req.bookTitle}"! Student can collect the book.`);
+          if (window.confetti) window.confetti({ particleCount: 60, spread: 55 });
+        }, 400);
+      };
+
+      const handleAdminReject = (req) => {
+        setDisappearingReqId(req.id);
+        setTimeout(() => {
+          setRequests(prev => prev.filter(r => r.id !== req.id));
+          setDisappearingReqId(null);
+          showToast(`❌ Request for "${req.bookTitle}" rejected.`, 'info');
+        }, 400);
+      };
+
+      const handleEmployeeCollectBook = (loan) => {
+        setActiveLoans(prev => prev.filter(l => l.id !== loan.id));
+        setBooks(prev => prev.map(b => b.id === loan.bookId ? { ...b, availableCopies: b.availableCopies + 1, shelfStatus: 'Needs Rearranging' } : b));
+        showToast(`✅ Staff collected "${loan.bookTitle}" from ${loan.studentName}! Marked for shelf sorting.`);
+        if (window.confetti) window.confetti({ particleCount: 50, spread: 50 });
+      };
+
+      const handleEmployeeArrangeShelf = (bookId, shelf) => {
+        setBooks(prev => prev.map(b => b.id === bookId ? { ...b, shelfStatus: 'Arranged' } : b));
+        showToast(`📚 Book properly placed in ${shelf}! Shelf index updated.`);
+      };
+
+      // --- RENDER: LOGIN / REGISTRATION PAGE IF LOGGED OUT ---
+      if (!isAuthenticated) {
+        return (
+          <div className="min-h-screen bg-[#090e1a] text-slate-100 flex items-center justify-center p-4">
+            <div className="w-full max-w-md bg-[#0f172a] border border-slate-800 rounded-3xl p-8 shadow-2xl space-y-6">
+              <div className="text-center space-y-2">
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-emerald-600 via-teal-500 to-cyan-400 flex items-center justify-center mx-auto shadow-lg shadow-emerald-500/25">
+                  <i data-lucide="book-marked" className="w-7 h-7 text-white"></i>
+                </div>
+                <h1 className="text-2xl font-extrabold text-white tracking-tight">Smart Library Hub</h1>
+                <p className="text-xs text-slate-400">Select your role to Login or Create a New Account</p>
+              </div>
+
+              <div className="p-1 rounded-2xl bg-slate-950 border border-slate-800 grid grid-cols-3 gap-1 text-xs font-bold">
+                <button
+                  type="button"
+                  onClick={() => setLoginRoleTab('student')}
+                  className={`py-2 rounded-xl transition flex flex-col items-center gap-1 ${
+                    loginRoleTab === 'student' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <i data-lucide="user" className="w-4 h-4"></i>
+                  <span>Student</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLoginRoleTab('employee')}
+                  className={`py-2 rounded-xl transition flex flex-col items-center gap-1 ${
+                    loginRoleTab === 'employee' ? 'bg-amber-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <i data-lucide="briefcase" className="w-4 h-4"></i>
+                  <span>Employee</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLoginRoleTab('admin')}
+                  className={`py-2 rounded-xl transition flex flex-col items-center gap-1 ${
+                    loginRoleTab === 'admin' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <i data-lucide="shield" className="w-4 h-4"></i>
+                  <span>Admin</span>
+                </button>
+              </div>
+
+              <div className="flex border-b border-slate-800 text-xs font-semibold text-center">
+                <button
+                  type="button"
+                  onClick={() => setAuthMode('login')}
+                  className={`flex-1 pb-2 transition ${authMode === 'login' ? 'text-emerald-400 border-b-2 border-emerald-500 font-bold' : 'text-slate-400'}`}
+                >
+                  Sign In ({loginRoleTab.toUpperCase()})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAuthMode('register')}
+                  className={`flex-1 pb-2 transition ${authMode === 'register' ? 'text-emerald-400 border-b-2 border-emerald-500 font-bold' : 'text-slate-400'}`}
+                >
+                  Register New Account
+                </button>
+              </div>
+
+              <form onSubmit={handleAuthSubmit} className="space-y-4 text-xs">
+                <div>
+                  <label className="block text-slate-400 font-semibold mb-1">
+                    {loginRoleTab === 'student' ? 'Full Student Name' : loginRoleTab === 'employee' ? 'Staff / Employee Name' : 'Admin Name'}
+                  </label>
+                  <input
+                    name="name"
+                    required
+                    defaultValue={loginRoleTab === 'student' ? 'Ramya Sri' : loginRoleTab === 'employee' ? 'Suresh Kumar' : 'Dr. Ramesh Sharma'}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-400 font-semibold mb-1">
+                    {loginRoleTab === 'student' ? 'Student ID / Roll Number' : loginRoleTab === 'employee' ? 'Staff Employee ID' : 'Admin License ID'}
+                  </label>
+                  <input
+                    name="idNumber"
+                    required
+                    defaultValue={loginRoleTab === 'student' ? '2026-CS-042' : loginRoleTab === 'employee' ? 'LIB-EMP-108' : 'LIB-ADM-001'}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-400 font-semibold mb-1">Email Address</label>
+                  <input
+                    name="email"
+                    type="email"
+                    required
+                    defaultValue={loginRoleTab === 'student' ? 'ramya.sri@college.edu' : loginRoleTab === 'employee' ? 'suresh.staff@library.edu' : 'admin@library.edu'}
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-400 font-semibold mb-1">Password</label>
+                  <input
+                    type="password"
+                    required
+                    defaultValue="••••••••"
+                    className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3.5 py-2.5 text-white focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+
+                <input type="hidden" name="role" value={loginRoleTab} />
+
+                <button
+                  type="submit"
+                  className={`w-full py-3 rounded-xl font-bold text-sm shadow-xl transition active:scale-95 ${
+                    loginRoleTab === 'employee'
+                      ? 'bg-amber-600 hover:bg-amber-500 text-white shadow-amber-600/30'
+                      : loginRoleTab === 'admin'
+                      ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-blue-600/30'
+                      : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/30'
+                  }`}
+                >
+                  {authMode === 'login' ? `Sign In as ${loginRoleTab.toUpperCase()}` : `Register as ${loginRoleTab.toUpperCase()}`}
+                </button>
+              </form>
+            </div>
+          </div>
+        );
+      }
+
+      // --- MAIN APPLICATION VIEWPORT ---
+      return (
+        <div className="flex h-screen bg-[#090e1a] text-slate-100 overflow-hidden font-sans">
+          
+          {/* TOAST NOTIFICATION */}
+          {toastMsg && (
+            <div className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-2xl transition-all duration-300 text-sm font-medium border ${
+              toastMsg.type === 'error' ? 'bg-rose-950/95 border-rose-700/80 text-rose-200' :
+              toastMsg.type === 'info' ? 'bg-blue-950/95 border-blue-700/80 text-blue-200' :
+              'bg-emerald-950/95 border-emerald-700/80 text-emerald-200'
+            }`}>
+              <i data-lucide={toastMsg.type === 'error' ? 'alert-circle' : toastMsg.type === 'info' ? 'info' : 'check-circle-2'} className="w-5 h-5"></i>
+              <span>{toastMsg.text}</span>
+            </div>
+          )}
+
+          {/* CHECK-IN / CHECK-OUT SUCCESS CONFIRMATION MODAL */}
+          {scanSuccessEvent && (
+            <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+              <div className="bg-[#0f172a] border border-emerald-500/50 rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-5 text-center animate-in zoom-in-95">
+                <div className="w-16 h-16 rounded-3xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto border border-emerald-500/40">
+                  <i data-lucide="check-circle-2" className="w-9 h-9"></i>
+                </div>
+
+                <div>
+                  <h3 className="text-xl font-extrabold text-white">
+                    {scanSuccessEvent.type === 'CHECK-IN' ? '🎉 Check-In Successful!' : '👋 Check-Out Successful!'}
+                  </h3>
+                  <p className="text-xs text-emerald-400 font-semibold mt-1">Recorded in Library Attendance Book</p>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 text-left space-y-2 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Student Name:</span>
+                    <span className="font-bold text-white">{scanSuccessEvent.name}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Student ID / Roll:</span>
+                    <span className="font-mono font-bold text-indigo-300">{scanSuccessEvent.roll}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Attendance Event:</span>
+                    <span className="font-bold text-emerald-400">{scanSuccessEvent.type}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Attendance Time:</span>
+                    <span className="font-bold text-amber-300">{scanSuccessEvent.time}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Date:</span>
+                    <span className="text-slate-300">{scanSuccessEvent.date}</span>
+                  </div>
+                </div>
+
+                <div className="flex gap-3 pt-2">
+                  <button
+                    onClick={() => {
+                      setScanSuccessEvent(null);
+                      setActiveTab(currentUser.role === 'student' ? 'student_attendance_book' : 'emp_visitors');
+                    }}
+                    className="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition"
+                  >
+                    View Attendance Book
+                  </button>
+                  <button
+                    onClick={() => setScanSuccessEvent(null)}
+                    className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-600/30 transition"
+                  >
+                    Done ✓
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* DEDICATED PHONE QR SCANNER MODAL */}
+          {isScannerModalOpen && (
+            <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+              <div className="bg-[#0f172a] border border-slate-800 rounded-3xl w-full max-w-md p-6 shadow-2xl space-y-5 animate-in zoom-in-95">
+                
+                <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                      <i data-lucide="qr-code" className="w-5 h-5"></i>
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-base text-white">
+                        {scannerActionType === 'CHECK-IN' ? 'Library Entry Check-In QR' : 'Library Exit Check-Out QR'}
+                      </h3>
+                      <p className="text-[11px] text-slate-400">Point your phone camera to scan</p>
+                    </div>
+                  </div>
+                  <button onClick={closeScanner} className="text-slate-400 hover:text-white text-lg">✕</button>
+                </div>
+
+                <div 
+                  onClick={handleTriggerPhoneScan}
+                  className={`p-6 rounded-3xl bg-slate-950 border transition-all duration-300 flex flex-col items-center justify-center text-center space-y-4 cursor-pointer relative group ${
+                    scanState === 'SCAN_DETECTED' 
+                      ? 'border-emerald-500 bg-emerald-950/20 ring-4 ring-emerald-500/20' 
+                      : 'border-slate-800 hover:border-emerald-500/50'
+                  }`}
+                  title="Click / Point Phone to Trigger Scan"
+                >
+                  {scanState === 'IDLE_WAITING_SCAN' ? (
+                    <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-semibold">
+                      <div className="w-2 h-2 rounded-full bg-amber-400 animate-ping"></div>
+                      <span>⏳ Waiting for Phone Scan...</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 px-3.5 py-1 rounded-full bg-emerald-500 text-slate-950 text-xs font-extrabold shadow-lg shadow-emerald-500/40 animate-bounce">
+                      <i data-lucide="check-circle" className="w-4 h-4"></i>
+                      <span>✓ PHONE SCAN DETECTED!</span>
+                    </div>
+                  )}
+
+                  <div className="relative p-3 bg-white rounded-3xl shadow-2xl flex items-center justify-center overflow-hidden">
+                    <div id="phone-scan-qrcode-only"></div>
+                    {scanState === 'IDLE_WAITING_SCAN' && <div className="qr-laser-line"></div>}
+                    {scanState === 'SCAN_DETECTED' && (
+                      <div className="absolute inset-0 bg-emerald-600/90 flex flex-col items-center justify-center text-white backdrop-blur-sm animate-in zoom-in-95">
+                        <i data-lucide="check" className="w-12 h-12 text-white stroke-[3]"></i>
+                        <span className="text-xs font-extrabold uppercase mt-1">Scanned!</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <p className="text-xs text-slate-400 group-hover:text-emerald-300 transition">
+                    {scanState === 'IDLE_WAITING_SCAN'
+                      ? '📱 Point phone camera at QR code (or click box to simulate scan)'
+                      : '✨ Scan completed! Click "Scan Done" below to confirm attendance.'}
+                  </p>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-between text-xs">
+                  <div>
+                    <span className="text-[10px] text-slate-400 uppercase">Student Name:</span>
+                    <p className="font-bold text-white">{currentUser.name} • {currentUser.id}</p>
+                  </div>
+                  <span className={`font-bold px-2.5 py-1 rounded-lg ${
+                    scanState === 'SCAN_DETECTED' ? 'bg-emerald-500 text-slate-950' : 'bg-slate-800 text-slate-400'
+                  }`}>
+                    {scanState === 'SCAN_DETECTED' ? 'Ready to Confirm' : 'Scan Required'}
+                  </span>
+                </div>
+
+                <div className="pt-2">
+                  {scanState === 'IDLE_WAITING_SCAN' ? (
+                    <div className="flex gap-3">
+                      <button
+                        onClick={closeScanner}
+                        className="flex-1 py-3 rounded-2xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleTriggerPhoneScan}
+                        className="flex-1 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2 transition active:scale-95"
+                      >
+                        <i data-lucide="smartphone" className="w-4 h-4"></i>
+                        <span>Scan with Phone</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={handleCompleteScanDone}
+                      className="w-full py-3.5 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-sm shadow-xl shadow-emerald-500/40 flex items-center justify-center gap-2 transition active:scale-95 animate-in zoom-in-95"
+                    >
+                      <i data-lucide="check-check" className="w-5 h-5"></i>
+                      <span>Scan Done ✓ (Confirm {scannerActionType})</span>
+                    </button>
+                  )}
+                </div>
+
+              </div>
+            </div>
+          )}
+
+          {/* SIDEBAR NAVIGATION */}
+          <aside className="w-72 bg-[#0c1322] border-r border-slate-800/80 flex flex-col justify-between shrink-0 select-none">
+            <div>
+              {/* Brand Header */}
+              <div className="p-6 border-b border-slate-800/60">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-600 via-teal-500 to-cyan-400 flex items-center justify-center shadow-lg shadow-emerald-500/25">
+                    <i data-lucide="book-marked" className="w-5 h-5 text-white"></i>
+                  </div>
+                  <div>
+                    <h1 className="font-bold text-lg tracking-tight bg-gradient-to-r from-white via-slate-100 to-emerald-200 bg-clip-text text-transparent">
+                      Smart Library
+                    </h1>
+                    <p className="text-[10px] font-semibold tracking-wider text-emerald-400 uppercase">Campus Portal</p>
+                  </div>
+                </div>
+
+                {/* Library Hours */}
+                <div className="mt-4 p-2.5 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
+                    <span className="text-slate-300 font-semibold">Library Hours</span>
+                  </div>
+                  <span className="text-[11px] font-mono font-bold text-amber-300">9:00 AM - 5:00 PM</span>
+                </div>
+              </div>
+
+              {/* 3-Way Role Switcher */}
+              <div className="mx-4 my-4 p-1 rounded-2xl bg-slate-900 border border-slate-800 grid grid-cols-3 gap-1">
+                <button
+                  onClick={() => handleRoleSwitch('student')}
+                  className={`py-2 rounded-xl text-[11px] font-bold flex flex-col items-center gap-1 transition ${
+                    currentUser.role === 'student' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <i data-lucide="user" className="w-3.5 h-3.5"></i>
+                  <span>Student</span>
+                </button>
+                <button
+                  onClick={() => handleRoleSwitch('employee')}
+                  className={`py-2 rounded-xl text-[11px] font-bold flex flex-col items-center gap-1 transition ${
+                    currentUser.role === 'employee' ? 'bg-amber-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <i data-lucide="briefcase" className="w-3.5 h-3.5"></i>
+                  <span>Employee</span>
+                </button>
+                <button
+                  onClick={() => handleRoleSwitch('admin')}
+                  className={`py-2 rounded-xl text-[11px] font-bold flex flex-col items-center gap-1 transition relative ${
+                    currentUser.role === 'admin' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <i data-lucide="shield" className="w-3.5 h-3.5"></i>
+                  <span>Admin</span>
+                  {totalAdminNotifications > 0 && (
+                    <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-rose-500 text-white text-[9px] font-extrabold flex items-center justify-center animate-bounce">
+                      {totalAdminNotifications}
+                    </span>
+                  )}
+                </button>
+              </div>
+
+              {/* Navigation Menu by Role */}
+              <nav className="px-3 space-y-1 mt-2">
+                {/* 1. STUDENT NAVIGATION */}
+                {currentUser.role === 'student' && (
+                  <>
+                    <button
+                      onClick={() => setActiveTab('student_scanner')}
+                      className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl font-medium text-sm transition-all ${
+                        activeTab === 'student_scanner' ? 'bg-emerald-600/15 text-emerald-400 border border-emerald-500/30 font-semibold' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <i data-lucide="scan" className="w-4 h-4"></i>
+                        <span>Check-In & Check-Out</span>
+                      </div>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isStudentInside ? 'bg-emerald-500/20 text-emerald-300' : 'bg-slate-800 text-slate-400'}`}>
+                        {isStudentInside ? 'Inside' : 'Outside'}
+                      </span>
+                    </button>
+
+                    <button
+                      onClick={() => setActiveTab('student_catalog')}
+                      className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl font-medium text-sm transition-all ${
+                        activeTab === 'student_catalog' ? 'bg-emerald-600/15 text-emerald-400 border border-emerald-500/30 font-semibold' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <i data-lucide="library" className="w-4 h-4"></i>
+                        <span>Select Books & Request</span>
+                      </div>
+                      <span className="text-xs bg-slate-800 px-2 py-0.5 rounded-full text-slate-400">{books.length}</span>
+                    </button>
+
+                    <button
+                      onClick={() => setActiveTab('student_mybooks')}
+                      className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl font-medium text-sm transition-all ${
+                        activeTab === 'student_mybooks' ? 'bg-emerald-600/15 text-emerald-400 border border-emerald-500/30 font-semibold' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <i data-lucide="bookmark-check" className="w-4 h-4"></i>
+                        <span>My Books & Fines</span>
+                      </div>
+                      {totalStudentFine > 0 && (
+                        <span className="text-[10px] bg-rose-500/20 text-rose-300 font-bold px-2 py-0.5 rounded-full">₹{totalStudentFine} Fine</span>
+                      )}
+                    </button>
+
+                    <button
+                      onClick={() => setActiveTab('student_attendance_book')}
+                      className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl font-medium text-sm transition-all ${
+                        activeTab === 'student_attendance_book' ? 'bg-emerald-600/15 text-emerald-400 border border-emerald-500/30 font-semibold' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <i data-lucide="clipboard-list" className="w-4 h-4"></i>
+                        <span>My Attendance Book</span>
+                      </div>
+                      <span className="text-xs bg-slate-800 px-2 py-0.5 rounded-full text-slate-400">{attendanceLogs.length}</span>
+                    </button>
+                  </>
+                )}
+
+                {/* 2. LIBRARY EMPLOYEE NAVIGATION */}
+                {currentUser.role === 'employee' && (
+                  <>
+                    <button
+                      onClick={() => setActiveTab('emp_restock_audit')}
+                      className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl font-medium text-sm transition-all ${
+                        activeTab === 'emp_restock_audit' ? 'bg-amber-600/15 text-amber-400 border border-amber-500/30 font-semibold' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <i data-lucide="boxes" className="w-4 h-4"></i>
+                        <span>Audit & Request Restock</span>
+                      </div>
+                      <span className="text-xs bg-amber-500/20 text-amber-300 font-bold px-2 py-0.5 rounded-full">Alert Admin</span>
+                    </button>
+
+                    <button
+                      onClick={() => setActiveTab('emp_duty_attendance')}
+                      className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl font-medium text-sm transition-all ${
+                        activeTab === 'emp_duty_attendance' ? 'bg-amber-600/15 text-amber-400 border border-amber-500/30 font-semibold' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <i data-lucide="user-check" className="w-4 h-4"></i>
+                        <span>My Staff Duty Attendance</span>
+                      </div>
+                      <span className="text-xs bg-emerald-500/20 text-emerald-300 font-bold px-2 py-0.5 rounded-full">Duty</span>
+                    </button>
+
+                    <button
+                      onClick={() => setActiveTab('emp_visitors')}
+                      className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl font-medium text-sm transition-all ${
+                        activeTab === 'emp_visitors' ? 'bg-amber-600/15 text-amber-400 border border-amber-500/30 font-semibold' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <i data-lucide="users" className="w-4 h-4"></i>
+                        <span>Student Visitors Log</span>
+                      </div>
+                      <span className="text-xs bg-slate-800 px-2 py-0.5 rounded-full text-slate-400">{attendanceLogs.length}</span>
+                    </button>
+
+                    <button
+                      onClick={() => setActiveTab('emp_returns')}
+                      className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl font-medium text-sm transition-all ${
+                        activeTab === 'emp_returns' ? 'bg-amber-600/15 text-amber-400 border border-amber-500/30 font-semibold' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <i data-lucide="inbox" className="w-4 h-4"></i>
+                        <span>Collect Returned Books</span>
+                      </div>
+                      <span className="text-xs bg-emerald-500/20 text-emerald-300 font-bold px-2 py-0.5 rounded-full">{activeLoans.length}</span>
+                    </button>
+
+                    <button
+                      onClick={() => setActiveTab('emp_shelving')}
+                      className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl font-medium text-sm transition-all ${
+                        activeTab === 'emp_shelving' ? 'bg-amber-600/15 text-amber-400 border border-amber-500/30 font-semibold' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <i data-lucide="layers" className="w-4 h-4"></i>
+                        <span>Shelf & Rack Arranger</span>
+                      </div>
+                      <span className="text-xs bg-slate-800 px-2 py-0.5 rounded-full text-slate-400">Racks</span>
+                    </button>
+                  </>
+                )}
+
+                {/* 3. CHIEF ADMIN NAVIGATION */}
+                {currentUser.role === 'admin' && (
+                  <>
+                    <button
+                      onClick={() => setActiveTab('admin_restock_requests')}
+                      className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl font-medium text-sm transition-all ${
+                        activeTab === 'admin_restock_requests' ? 'bg-blue-600/15 text-blue-400 border border-blue-500/30 font-semibold' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <i data-lucide="bell" className="w-4 h-4"></i>
+                        <span>Staff Restock Alerts</span>
+                      </div>
+                      {pendingRestockRequestsCount > 0 ? (
+                        <span className="text-xs bg-rose-500 text-white font-extrabold px-2 py-0.5 rounded-full animate-bounce">{pendingRestockRequestsCount}</span>
+                      ) : (
+                        <span className="text-xs bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full">0</span>
+                      )}
+                    </button>
+
+                    <button
+                      onClick={() => setActiveTab('admin_requests')}
+                      className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl font-medium text-sm transition-all ${
+                        activeTab === 'admin_requests' ? 'bg-blue-600/15 text-blue-400 border border-blue-500/30 font-semibold' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <i data-lucide="inbox" className="w-4 h-4"></i>
+                        <span>Student Borrow Requests</span>
+                      </div>
+                      {pendingBorrowRequestsCount > 0 ? (
+                        <span className="text-xs bg-amber-500 text-slate-950 font-bold px-2 py-0.5 rounded-full">{pendingBorrowRequestsCount}</span>
+                      ) : (
+                        <span className="text-xs bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full">0</span>
+                      )}
+                    </button>
+
+                    <button
+                      onClick={() => setActiveTab('admin_emp_attendance')}
+                      className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl font-medium text-sm transition-all ${
+                        activeTab === 'admin_emp_attendance' ? 'bg-blue-600/15 text-blue-400 border border-blue-500/30 font-semibold' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <i data-lucide="user-check" className="w-4 h-4"></i>
+                        <span>Employee Attendance Log</span>
+                      </div>
+                      <span className="text-xs bg-amber-500/20 text-amber-300 font-bold px-2 py-0.5 rounded-full">{employeeAttendanceLogs.length}</span>
+                    </button>
+
+                    <button
+                      onClick={() => setActiveTab('admin_inventory')}
+                      className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl font-medium text-sm transition-all ${
+                        activeTab === 'admin_inventory' ? 'bg-blue-600/15 text-blue-400 border border-blue-500/30 font-semibold' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <i data-lucide="boxes" className="w-4 h-4"></i>
+                        <span>Stock & Master Catalog</span>
+                      </div>
+                      <span className="text-xs bg-slate-800 px-2 py-0.5 rounded-full text-slate-400">{books.length}</span>
+                    </button>
+
+                    <button
+                      onClick={() => setActiveTab('admin_attendance')}
+                      className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl font-medium text-sm transition-all ${
+                        activeTab === 'admin_attendance' ? 'bg-blue-600/15 text-blue-400 border border-blue-500/30 font-semibold' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <i data-lucide="users" className="w-4 h-4"></i>
+                        <span>Student Attendance Register</span>
+                      </div>
+                      <span className="text-xs bg-slate-800 px-2 py-0.5 rounded-full text-slate-400">{attendanceLogs.length}</span>
+                    </button>
+
+                    <button
+                      onClick={() => setActiveTab('admin_fines')}
+                      className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl font-medium text-sm transition-all ${
+                        activeTab === 'admin_fines' ? 'bg-blue-600/15 text-blue-400 border border-blue-500/30 font-semibold' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <i data-lucide="receipt" className="w-4 h-4"></i>
+                        <span>Overdue Loans & Fines</span>
+                      </div>
+                      <span className="text-xs bg-amber-500/20 text-amber-300 font-bold px-2 py-0.5 rounded-full">₹20/Day</span>
+                    </button>
+                  </>
+                )}
+              </nav>
+            </div>
+
+            {/* Logout */}
+            <div className="p-4 border-t border-slate-800/60 bg-slate-900/40 space-y-2">
+              <button
+                onClick={() => {
+                  setIsAuthenticated(false);
+                  showToast('Logged out of session', 'info');
+                }}
+                className="w-full py-2 px-3 rounded-xl bg-slate-800/80 hover:bg-rose-950/40 text-slate-400 hover:text-rose-300 text-xs font-semibold flex items-center justify-center gap-2 transition border border-slate-700/50"
+              >
+                <i data-lucide="log-out" className="w-3.5 h-3.5"></i>
+                <span>Logout / Switch Account</span>
+              </button>
+            </div>
+          </aside>
+
+          {/* MAIN VIEWPORT */}
+          <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+            
+            {/* TOP BAR */}
+            <header className="h-16 bg-[#0c1322]/90 border-b border-slate-800/80 px-8 flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-4 flex-1 max-w-xl">
+                <div className="relative w-full">
+                  <i data-lucide="search" className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+                  <input
+                    type="text"
+                    placeholder="Search Government Jobs, Current Affairs, Engineering, Stories..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 bg-slate-900/90 border border-slate-800 rounded-xl text-xs text-slate-200 focus:outline-none focus:border-emerald-500 placeholder-slate-500 transition"
+                  />
+                  {searchQuery && (
+                    <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xs">✕</button>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800">
+                  <div className={`w-7 h-7 rounded-full flex items-center justify-center font-bold text-xs ${
+                    currentUser.role === 'admin' ? 'bg-blue-500/20 text-blue-400' : currentUser.role === 'employee' ? 'bg-amber-500/20 text-amber-400' : 'bg-emerald-500/20 text-emerald-400'
+                  }`}>
+                    {currentUser.role === 'admin' ? 'AD' : currentUser.role === 'employee' ? 'EMP' : 'STU'}
+                  </div>
+                  <div className="text-left">
+                    <p className="text-xs font-semibold text-white leading-none">{currentUser.name}</p>
+                    <span className="text-[10px] text-slate-400 font-medium capitalize">{currentUser.title}</span>
+                  </div>
+                </div>
+              </div>
+            </header>
+
+            {/* TAB CONTENTS */}
+            <main className="flex-1 overflow-y-auto p-8 bg-[#090e1a]">
+              
+              {/* ===================== STUDENT PORTAL ===================== */}
+              {currentUser.role === 'student' && (
+                <>
+                  {activeTab === 'student_scanner' && (
+                    <div className="space-y-8 max-w-4xl mx-auto">
+                      <div>
+                        <h2 className="text-2xl font-extrabold text-white flex items-center gap-3">
+                          <span>Library Gate Check-In & Check-Out Scanner</span>
+                          <span className="text-xl">🚪</span>
+                        </h2>
+                        <p className="text-slate-400 text-sm mt-1">
+                          Click the Scanner below. Point your mobile phone to scan the QR code — <strong>"Scan Done" will appear ONLY after scanning</strong>.
+                        </p>
+                      </div>
+
+                      <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-950/60 to-slate-900 border border-emerald-800/40 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold">
+                            <i data-lucide="clock" className="w-5 h-5"></i>
+                          </div>
+                          <div>
+                            <h4 className="font-bold text-sm text-white">Library Operational Timings: 9:00 AM to 5:00 PM</h4>
+                            <p className="text-xs text-slate-400">Current status: Open for Student Entry & Book Circulation.</p>
+                          </div>
+                        </div>
+                        <span className="text-xs font-bold px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                          OPEN (9 AM - 5 PM) ✓
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="p-6 rounded-3xl bg-slate-900/80 border border-slate-800/80 flex flex-col justify-between space-y-5 hover:border-emerald-500/50 transition group">
+                          <div className="space-y-3">
+                            <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center group-hover:scale-110 transition">
+                              <i data-lucide="log-in" className="w-6 h-6"></i>
+                            </div>
+                            <h3 className="font-extrabold text-lg text-white">1. Library Entry Check-In</h3>
+                            <p className="text-xs text-slate-400 leading-relaxed">
+                              Click to launch Scanner. Point your mobile phone camera to scan. <strong>"Scan Done"</strong> will unlock only upon scan completion.
+                            </p>
+                          </div>
+
+                          <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 text-center space-y-2">
+                            <span className="text-xs text-emerald-400 font-semibold flex items-center justify-center gap-1.5">
+                              <i data-lucide="qr-code" className="w-4 h-4"></i>
+                              <span>Student ID: {currentUser.id}</span>
+                            </span>
+                            <p className="text-[11px] text-slate-500">Auto-links to Attendance Book</p>
+                          </div>
+
+                          <button
+                            onClick={() => openScanner('CHECK-IN')}
+                            className="w-full py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm shadow-xl shadow-emerald-600/30 flex items-center justify-center gap-2 transition active:scale-95"
+                          >
+                            <i data-lucide="scan" className="w-5 h-5"></i>
+                            <span>Click to Open Check-In Scanner</span>
+                          </button>
+                        </div>
+
+                        <div className="p-6 rounded-3xl bg-slate-900/80 border border-slate-800/80 flex flex-col justify-between space-y-5 hover:border-rose-500/50 transition group">
+                          <div className="space-y-3">
+                            <div className="w-12 h-12 rounded-2xl bg-rose-500/20 text-rose-400 flex items-center justify-center group-hover:scale-110 transition">
+                              <i data-lucide="log-out" className="w-6 h-6"></i>
+                            </div>
+                            <h3 className="font-extrabold text-lg text-white">2. Library Exit Check-Out</h3>
+                            <p className="text-xs text-slate-400 leading-relaxed">
+                              When leaving the library, click to open Scanner. Scan with phone to record your <strong>Exit Timestamp</strong> in the Attendance Book.
+                            </p>
+                          </div>
+
+                          <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 text-center space-y-2">
+                            <span className="text-xs text-rose-300 font-semibold flex items-center justify-center gap-1.5">
+                              <i data-lucide="check-square" className="w-4 h-4"></i>
+                              <span>Exit Check-Out Gate</span>
+                            </span>
+                            <p className="text-[11px] text-slate-500">Closes your daily library visit log</p>
+                          </div>
+
+                          <button
+                            onClick={() => openScanner('CHECK-OUT')}
+                            className="w-full py-3.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-rose-300 font-bold text-sm border border-rose-900/50 flex items-center justify-center gap-2 transition active:scale-95"
+                          >
+                            <i data-lucide="scan" className="w-5 h-5"></i>
+                            <span>Click to Open Check-Out Scanner</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {activeTab === 'student_catalog' && (
+                    <div className="space-y-8 max-w-7xl mx-auto">
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div>
+                          <h2 className="text-2xl font-extrabold text-white">Explore & Select Books</h2>
+                          <p className="text-slate-400 text-sm">
+                            Select any book and send a <strong>Borrow Request</strong> to the Admin. <strong>Rule: 2 Days limit</strong>.
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 max-w-full">
+                          {categories.map(cat => (
+                            <button
+                              key={cat}
+                              onClick={() => setSelectedCategory(cat)}
+                              className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition shrink-0 ${
+                                selectedCategory === cat ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30' : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-200'
+                              }`}
+                            >
+                              {cat}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                        {filteredBooks.map(b => {
+                          const isPending = requests.some(r => r.bookId === b.id && r.status === 'pending');
+                          const isLoaned = activeLoans.some(l => l.bookId === b.id);
+
+                          return (
+                            <div key={b.id} className="p-5 rounded-3xl bg-slate-900/80 border border-slate-800/80 flex flex-col justify-between hover:border-emerald-500/50 transition shadow-xl group">
+                              <div>
+                                <div className="h-44 rounded-2xl overflow-hidden relative mb-3 bg-slate-800">
+                                  <img src={b.cover} alt={b.title} className="w-full h-full object-cover group-hover:scale-105 transition duration-300" />
+                                  <span className="absolute top-2 left-2 text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-950/90 text-slate-300 border border-slate-800">
+                                    {b.shelf}
+                                  </span>
+                                  <span className={`absolute top-2 right-2 text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
+                                    b.availableCopies > 0 ? 'bg-emerald-950/90 text-emerald-300 border border-emerald-700/60' : 'bg-rose-950/90 text-rose-300 border border-rose-700/60'
+                                  }`}>
+                                    {b.availableCopies > 0 ? `${b.availableCopies} In Stock` : 'Out of Stock'}
+                                  </span>
+                                </div>
+
+                                <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider block mb-1">{b.category}</span>
+                                <h4 className="font-bold text-sm text-white line-clamp-2 leading-snug group-hover:text-emerald-300 transition">{b.title}</h4>
+                                <p className="text-xs text-slate-400 truncate mt-1">Author: {b.author}</p>
+                                <p className="text-[11px] text-slate-500 line-clamp-2 mt-2 leading-relaxed">{b.description}</p>
+                              </div>
+
+                              <div className="mt-4 pt-3 border-t border-slate-800/80">
+                                {isLoaned ? (
+                                  <div className="py-2 rounded-xl bg-emerald-950/60 border border-emerald-800/50 text-emerald-300 text-xs font-bold text-center">
+                                    Currently Issued to You ✓
+                                  </div>
+                                ) : isPending ? (
+                                  <div className="py-2 rounded-xl bg-amber-950/60 border border-amber-800/50 text-amber-300 text-xs font-bold text-center flex items-center justify-center gap-1.5">
+                                    <i data-lucide="hourglass" className="w-3.5 h-3.5 animate-spin"></i>
+                                    <span>Request Sent (Waiting Approval)</span>
+                                  </div>
+                                ) : (
+                                  <button
+                                    onClick={() => handleSendBorrowRequest(b)}
+                                    disabled={b.availableCopies <= 0}
+                                    className={`w-full py-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 ${
+                                      b.availableCopies > 0 ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/30 active:scale-95' : 'bg-slate-800 text-slate-600 cursor-not-allowed'
+                                    }`}
+                                  >
+                                    <i data-lucide="send" className="w-3.5 h-3.5"></i>
+                                    <span>{b.availableCopies > 0 ? 'Send Borrow Request to Admin' : 'Out of Stock (Alert Staff)'}</span>
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {activeTab === 'student_mybooks' && (
+                    <div className="space-y-8 max-w-5xl mx-auto">
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div>
+                          <h2 className="text-2xl font-extrabold text-white">My Active Loans & Fine Tracker</h2>
+                          <p className="text-slate-400 text-sm">
+                            Books can be kept for <strong>2 days</strong>. Return on 3rd day. If late, <strong>₹20 fine per day</strong> updates automatically.
+                          </p>
+                        </div>
+
+                        <div className="px-4 py-2 rounded-2xl bg-rose-950/40 border border-rose-800/60 text-right">
+                          <span className="text-[10px] text-rose-300 uppercase font-bold block">Accrued Fine</span>
+                          <span className="text-lg font-extrabold text-rose-400">₹{totalStudentFine}</span>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        {activeLoans.length === 0 ? (
+                          <div className="p-12 rounded-3xl bg-slate-900/60 border border-slate-800/80 text-center space-y-3">
+                            <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center mx-auto">
+                              <i data-lucide="check-circle" className="w-6 h-6"></i>
+                            </div>
+                            <h3 className="font-bold text-base text-white">No active borrowed books!</h3>
+                            <p className="text-xs text-slate-400 max-w-sm mx-auto">Browse the catalog to select and request books.</p>
+                          </div>
+                        ) : (
+                          activeLoans.map(loan => {
+                            const { fine, overdueDays, isOverdue } = calculateFine(loan.borrowDate);
+
+                            return (
+                              <div key={loan.id} className="p-6 rounded-3xl bg-slate-900/80 border border-slate-800/80 flex flex-col md:flex-row md:items-center justify-between gap-6 hover:border-slate-700 transition">
+                                <div className="flex items-start gap-4">
+                                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${isOverdue ? 'bg-rose-500/20 text-rose-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
+                                    <i data-lucide="book-open" className="w-6 h-6"></i>
+                                  </div>
+                                  <div>
+                                    <h3 className="font-bold text-base text-white">{loan.bookTitle}</h3>
+                                    <p className="text-xs text-slate-400">Author: {loan.author}</p>
+                                    
+                                    <div className="flex flex-wrap items-center gap-3 mt-2 text-xs">
+                                      <span className="text-slate-400">📅 Borrowed: <strong>{loan.borrowDate}</strong></span>
+                                      <span className="text-slate-400">⏰ Return By: <strong>{loan.dueDate} (3rd Day)</strong></span>
+                                      <span className={`px-2.5 py-0.5 rounded-full font-bold text-[10px] ${
+                                        isOverdue ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                                      }`}>
+                                        {isOverdue ? `Overdue by ${overdueDays} Day(s)` : 'Within 2-Day Limit'}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center justify-between md:justify-end gap-5 shrink-0 pt-4 md:pt-0 border-t md:border-t-0 border-slate-800">
+                                  <div className="text-right">
+                                    <span className="text-[11px] text-slate-400 block">Fine (₹20/Day)</span>
+                                    <span className={`text-base font-extrabold ${fine > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                                      {fine > 0 ? `₹${fine}` : '₹0 (No Fine)'}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {activeTab === 'student_attendance_book' && (
+                    <div className="space-y-6 max-w-5xl mx-auto">
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div>
+                          <h2 className="text-2xl font-extrabold text-white">Library Attendance Book (Student View)</h2>
+                          <p className="text-slate-400 text-sm">
+                            Verified records of your library visits with <strong>Student Name, ID, and Exact Timestamps</strong>.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="rounded-3xl bg-slate-900/80 border border-slate-800/80 overflow-hidden shadow-xl">
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left text-xs">
+                            <thead className="bg-slate-950 text-slate-400 uppercase font-semibold text-[10px] tracking-wider border-b border-slate-800">
+                              <tr>
+                                <th className="p-4">Student Name</th>
+                                <th className="p-4">Student ID / Roll</th>
+                                <th className="p-4">Scan Event</th>
+                                <th className="p-4">Attendance Time</th>
+                                <th className="p-4">Date</th>
+                                <th className="p-4 text-right">Status</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-800/60">
+                              {attendanceLogs.map(log => (
+                                <tr key={log.id} className="hover:bg-slate-800/40 transition">
+                                  <td className="p-4 font-bold text-white">{log.studentName}</td>
+                                  <td className="p-4 font-mono text-indigo-300 font-semibold">{log.studentRoll}</td>
+                                  <td className="p-4">
+                                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
+                                      log.type === 'CHECK-IN' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'
+                                    }`}>
+                                      {log.type === 'CHECK-IN' ? '✓ Gate Check-In' : '🚪 Gate Check-Out'}
+                                    </span>
+                                  </td>
+                                  <td className="p-4 font-bold text-amber-300">{log.time}</td>
+                                  <td className="p-4 text-slate-400">{log.date}</td>
+                                  <td className="p-4 text-right">
+                                    <span className={`font-semibold ${log.status === 'Inside Library' ? 'text-emerald-400' : 'text-slate-400'}`}>
+                                      {log.status}
+                                    </span>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* ===================== LIBRARY EMPLOYEE PORTAL ===================== */}
+              {currentUser.role === 'employee' && (
+                <>
+                  {/* 1. STOCK AUDIT & SEND RESTOCK REQUEST TO ADMIN */}
+                  {activeTab === 'emp_restock_audit' && (
+                    <div className="space-y-6 max-w-6xl mx-auto">
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div>
+                          <h2 className="text-2xl font-extrabold text-white flex items-center gap-3">
+                            <span>Stock Audit & Alert Admin for Restock</span>
+                            <span className="text-xs bg-amber-500/20 text-amber-300 px-3 py-1 rounded-full font-bold">Staff Stock Control</span>
+                          </h2>
+                          <p className="text-slate-400 text-sm mt-1">
+                            Inspect library catalog stock. When copies run out or are low, click <strong>"Send Restock Request to Admin"</strong> to alert the Chief Librarian.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="rounded-3xl bg-slate-900/80 border border-slate-800/80 overflow-hidden shadow-xl">
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left text-xs">
+                            <thead className="bg-slate-950 text-slate-400 uppercase font-semibold text-[10px] tracking-wider border-b border-slate-800">
+                              <tr>
+                                <th className="p-4">Book Title & Author</th>
+                                <th className="p-4">Category</th>
+                                <th className="p-4">Shelf Location</th>
+                                <th className="p-4">Available / Total</th>
+                                <th className="p-4">Current Stock Status</th>
+                                <th className="p-4 text-right">Employee Restock Alert</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-800/60">
+                              {books.map(b => {
+                                const isPendingRestock = restockRequests.some(r => r.bookId === b.id && r.status === 'pending');
+
+                                return (
+                                  <tr key={b.id} className="hover:bg-slate-800/40 transition">
+                                    <td className="p-4 max-w-xs">
+                                      <p className="font-bold text-white text-sm truncate">{b.title}</p>
+                                      <p className="text-slate-400 text-xs mt-0.5">{b.author}</p>
+                                    </td>
+                                    <td className="p-4">
+                                      <span className="px-2.5 py-1 rounded-full bg-slate-800 text-slate-300 text-[10px] font-semibold">
+                                        {b.category}
+                                      </span>
+                                    </td>
+                                    <td className="p-4 font-semibold text-amber-300">{b.shelf}</td>
+                                    <td className="p-4">
+                                      <span className="font-extrabold text-white text-sm">{b.availableCopies}</span>
+                                      <span className="text-slate-500"> / {b.copies} copies</span>
+                                    </td>
+                                    <td className="p-4">
+                                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
+                                        b.availableCopies === 0 ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40 animate-pulse' :
+                                        b.availableCopies <= 2 ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40' :
+                                        'bg-emerald-500/20 text-emerald-300'
+                                      }`}>
+                                        {b.availableCopies === 0 ? '⚠️ Out of Stock' : b.availableCopies <= 2 ? '⚠️ Low Stock' : 'In Stock ✓'}
+                                      </span>
+                                    </td>
+                                    <td className="p-4 text-right">
+                                      {isPendingRestock ? (
+                                        <span className="px-3 py-1.5 rounded-xl bg-amber-950/60 border border-amber-800/60 text-amber-300 text-[11px] font-bold inline-flex items-center gap-1.5">
+                                          <i data-lucide="bell" className="w-3.5 h-3.5 animate-bounce"></i>
+                                          <span>Restock Alert Sent to Admin</span>
+                                        </span>
+                                      ) : b.availableCopies <= 2 ? (
+                                        <button
+                                          onClick={() => handleEmployeeSendRestockRequest(b)}
+                                          className="px-3.5 py-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs shadow-md shadow-amber-600/30 flex items-center gap-1.5 ml-auto transition active:scale-95"
+                                        >
+                                          <i data-lucide="send" className="w-3.5 h-3.5"></i>
+                                          <span>Send Restock Request to Admin</span>
+                                        </button>
+                                      ) : (
+                                        <button
+                                          onClick={() => handleEmployeeSendRestockRequest(b)}
+                                          className="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-medium transition ml-auto"
+                                        >
+                                          Request More Copies (+5)
+                                        </button>
+                                      )}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 2. EMPLOYEE DUTY ATTENDANCE (STAFF CHECK-IN / CHECK-OUT) */}
+                  {activeTab === 'emp_duty_attendance' && (
+                    <div className="space-y-6 max-w-4xl mx-auto">
+                      <div>
+                        <h2 className="text-2xl font-extrabold text-white flex items-center gap-3">
+                          <span>Staff Duty Shift & Attendance</span>
+                          <span className="text-xs bg-amber-500/20 text-amber-300 px-3 py-1 rounded-full font-bold">Duty Registry</span>
+                        </h2>
+                        <p className="text-slate-400 text-sm mt-1">
+                          Log your daily shift check-in and check-out. Admin monitors employee attendance in real time.
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="p-6 rounded-3xl bg-slate-900/80 border border-slate-800 flex flex-col justify-between space-y-4">
+                          <div>
+                            <span className="text-xs font-bold text-emerald-400 uppercase">Duty Shift: 9 AM - 5 PM</span>
+                            <h3 className="font-extrabold text-lg text-white mt-1">Morning Shift Duty Check-In</h3>
+                            <p className="text-xs text-slate-400 mt-1">Record your duty arrival time for the Chief Librarian's log.</p>
+                          </div>
+                          <button
+                            onClick={() => handleEmployeeDutyAttendance('DUTY CHECK-IN')}
+                            className="w-full py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 transition active:scale-95"
+                          >
+                            <i data-lucide="check" className="w-4 h-4"></i>
+                            <span>Mark Duty Check-In</span>
+                          </button>
+                        </div>
+
+                        <div className="p-6 rounded-3xl bg-slate-900/80 border border-slate-800 flex flex-col justify-between space-y-4">
+                          <div>
+                            <span className="text-xs font-bold text-rose-400 uppercase">Shift End: 5:00 PM</span>
+                            <h3 className="font-extrabold text-lg text-white mt-1">Duty Shift Check-Out</h3>
+                            <p className="text-xs text-slate-400 mt-1">Record your departure timestamp at the end of the shift.</p>
+                          </div>
+                          <button
+                            onClick={() => handleEmployeeDutyAttendance('DUTY CHECK-OUT')}
+                            className="w-full py-3.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-rose-300 font-bold text-xs border border-rose-900/40 flex items-center justify-center gap-2 transition active:scale-95"
+                          >
+                            <i data-lucide="log-out" className="w-4 h-4"></i>
+                            <span>Mark Duty Check-Out</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* My Duty History */}
+                      <div className="pt-4 border-t border-slate-800 space-y-3">
+                        <h3 className="text-base font-bold text-white">My Recorded Duty Timestamps</h3>
+                        <div className="rounded-2xl bg-slate-900/80 border border-slate-800 overflow-hidden text-xs">
+                          <table className="w-full text-left">
+                            <thead className="bg-slate-950 text-slate-400 uppercase text-[10px] font-semibold border-b border-slate-800">
+                              <tr>
+                                <th className="p-3.5">Staff Name & ID</th>
+                                <th className="p-3.5">Duty Event</th>
+                                <th className="p-3.5">Time Logged</th>
+                                <th className="p-3.5">Shift</th>
+                                <th className="p-3.5 text-right">Date</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-800/60">
+                              {employeeAttendanceLogs.map(l => (
+                                <tr key={l.id}>
+                                  <td className="p-3.5 font-bold text-white">{l.empName} ({l.empId})</td>
+                                  <td className="p-3.5">
+                                    <span className={`px-2 py-0.5 rounded font-bold text-[10px] ${
+                                      l.type.includes('CHECK-IN') ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'
+                                    }`}>
+                                      {l.type}
+                                    </span>
+                                  </td>
+                                  <td className="p-3.5 font-bold text-amber-300">{l.time}</td>
+                                  <td className="p-3.5 text-slate-400">{l.shift}</td>
+                                  <td className="p-3.5 text-right text-slate-400">{l.date}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 3. VISITOR ATTENDANCE TRACKER */}
+                  {activeTab === 'emp_visitors' && (
+                    <div className="space-y-6 max-w-6xl mx-auto">
+                      <div>
+                        <h2 className="text-2xl font-extrabold text-white flex items-center gap-3">
+                          <span>Student Visitors & Footfall Tracker</span>
+                          <span className="text-xs bg-amber-500/20 text-amber-300 px-3 py-1 rounded-full font-bold">Staff Duty</span>
+                        </h2>
+                        <p className="text-slate-400 text-sm mt-1">
+                          Track which students entered the library today, their roll numbers, entry times and exit status.
+                        </p>
+                      </div>
+
+                      <div className="rounded-3xl bg-slate-900/80 border border-slate-800/80 overflow-hidden shadow-xl">
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left text-xs">
+                            <thead className="bg-slate-950 text-slate-400 uppercase font-semibold text-[10px] tracking-wider border-b border-slate-800">
+                              <tr>
+                                <th className="p-4">Visitor Student Name</th>
+                                <th className="p-4">Roll Number</th>
+                                <th className="p-4">Scan Event</th>
+                                <th className="p-4">Time Recorded</th>
+                                <th className="p-4">Date</th>
+                                <th className="p-4 text-right">Live Status</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-800/60">
+                              {attendanceLogs.map(log => (
+                                <tr key={log.id} className="hover:bg-slate-800/40 transition">
+                                  <td className="p-4 font-bold text-white flex items-center gap-2">
+                                    <div className="w-7 h-7 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center text-[10px] font-bold">
+                                      {log.studentName.slice(0, 2).toUpperCase()}
+                                    </div>
+                                    <span>{log.studentName}</span>
+                                  </td>
+                                  <td className="p-4 font-mono text-indigo-300 font-semibold">{log.studentRoll}</td>
+                                  <td className="p-4">
+                                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
+                                      log.type === 'CHECK-IN' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'
+                                    }`}>
+                                      {log.type === 'CHECK-IN' ? '✓ Gate Check-In' : '🚪 Gate Check-Out'}
+                                    </span>
+                                  </td>
+                                  <td className="p-4 font-bold text-amber-300">{log.time}</td>
+                                  <td className="p-4 text-slate-400">{log.date}</td>
+                                  <td className="p-4 text-right">
+                                    <span className={`font-semibold ${log.status === 'Inside Library' ? 'text-emerald-400' : 'text-slate-400'}`}>
+                                      {log.status}
+                                    </span>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 4. RETURN BOOK COLLECTION */}
+                  {activeTab === 'emp_returns' && (
+                    <div className="space-y-6 max-w-6xl mx-auto">
+                      <div>
+                        <h2 className="text-2xl font-extrabold text-white flex items-center gap-3">
+                          <span>Return Books Collection Desk</span>
+                          <span className="text-xs bg-emerald-500/20 text-emerald-300 px-3 py-1 rounded-full font-bold">Physical Counter</span>
+                        </h2>
+                        <p className="text-slate-400 text-sm mt-1">
+                          When students bring books back to the library counter, verify physical condition, collect any ₹20/day fine, and receive the book.
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        {activeLoans.length === 0 ? (
+                          <div className="col-span-2 p-12 rounded-3xl bg-slate-900/60 border border-slate-800 text-center space-y-2">
+                            <i data-lucide="check-circle" className="w-10 h-10 text-emerald-400 mx-auto"></i>
+                            <h4 className="font-bold text-base text-white">No pending books to collect!</h4>
+                          </div>
+                        ) : (
+                          activeLoans.map(loan => {
+                            const { fine, isOverdue, overdueDays } = calculateFine(loan.borrowDate);
+
+                            return (
+                              <div key={loan.id} className="p-6 rounded-3xl bg-slate-900/90 border border-slate-800/90 flex flex-col justify-between space-y-4 hover:border-amber-500/50 transition shadow-xl">
+                                <div className="space-y-2">
+                                  <div className="flex items-start justify-between">
+                                    <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-slate-800 text-slate-300">
+                                      Loan ID: {loan.id}
+                                    </span>
+                                    {fine > 0 ? (
+                                      <span className="text-xs font-extrabold text-rose-400 bg-rose-950/80 border border-rose-800/60 px-3 py-1 rounded-xl">
+                                        Collect Fine: ₹{fine} ({overdueDays} Days Late)
+                                      </span>
+                                    ) : (
+                                      <span className="text-xs font-bold text-emerald-400 bg-emerald-950/80 border border-emerald-800/60 px-3 py-1 rounded-xl">
+                                        No Fine (On Time)
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  <h3 className="font-extrabold text-lg text-white mt-1">{loan.bookTitle}</h3>
+                                  <p className="text-xs text-slate-400">Author: {loan.author}</p>
+
+                                  <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800/80 text-xs space-y-1">
+                                    <div className="flex justify-between">
+                                      <span className="text-slate-400">Student Name:</span>
+                                      <span className="font-bold text-white">{loan.studentName}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span className="text-slate-400">Roll Number:</span>
+                                      <span className="font-mono text-indigo-300">{loan.studentRoll}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                      <span className="text-slate-400">Borrowed On:</span>
+                                      <span className="text-slate-300">{loan.borrowDate}</span>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <button
+                                  onClick={() => handleEmployeeCollectBook(loan)}
+                                  className="w-full py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 transition active:scale-95"
+                                >
+                                  <i data-lucide="check-check" className="w-4 h-4"></i>
+                                  <span>Collect Book & Mark Received</span>
+                                </button>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 5. SHELF ARRANGER */}
+                  {activeTab === 'emp_shelving' && (
+                    <div className="space-y-6 max-w-6xl mx-auto">
+                      <div>
+                        <h2 className="text-2xl font-extrabold text-white flex items-center gap-3">
+                          <span>Shelf & Rack Organization Assistant</span>
+                          <span className="text-xs bg-indigo-500/20 text-indigo-300 px-3 py-1 rounded-full font-bold">Rack Sorting</span>
+                        </h2>
+                        <p className="text-slate-400 text-sm mt-1">
+                          Organize and re-shelve returned volumes to their respective racks.
+                        </p>
+                      </div>
+
+                      <div className="rounded-3xl bg-slate-900/80 border border-slate-800/80 overflow-hidden shadow-xl">
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left text-xs">
+                            <thead className="bg-slate-950 text-slate-400 uppercase font-semibold text-[10px] tracking-wider border-b border-slate-800">
+                              <tr>
+                                <th className="p-4">Book Title</th>
+                                <th className="p-4">Category</th>
+                                <th className="p-4">Assigned Rack Location</th>
+                                <th className="p-4">Current Shelf Status</th>
+                                <th className="p-4 text-right">Employee Action</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-800/60">
+                              {books.map(b => (
+                                <tr key={b.id} className="hover:bg-slate-800/40 transition">
+                                  <td className="p-4 font-bold text-white">{b.title}</td>
+                                  <td className="p-4">
+                                    <span className="px-2.5 py-1 rounded-full bg-slate-800 text-slate-300 text-[10px] font-semibold">
+                                      {b.category}
+                                    </span>
+                                  </td>
+                                  <td className="p-4 font-bold text-amber-300">{b.shelf}</td>
+                                  <td className="p-4">
+                                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
+                                      b.shelfStatus === 'Arranged' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse'
+                                    }`}>
+                                      {b.shelfStatus === 'Arranged' ? '✓ Correctly Shelved' : '⚠️ Needs Re-Shelving'}
+                                    </span>
+                                  </td>
+                                  <td className="p-4 text-right">
+                                    {b.shelfStatus !== 'Arranged' ? (
+                                      <button
+                                        onClick={() => handleEmployeeArrangeShelf(b.id, b.shelf)}
+                                        className="px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md shadow-indigo-600/30 transition"
+                                      >
+                                        Mark Shelved & Arranged
+                                      </button>
+                                    ) : (
+                                      <span className="text-slate-500 text-xs">Arranged ✓</span>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {/* ===================== CHIEF ADMIN PORTAL ===================== */}
+              {currentUser.role === 'admin' && (
+                <>
+                  {/* 1. ADMIN RESTOCK REQUESTS FROM STAFF (LIVE NOTIFICATION & DISAPPEAR) */}
+                  {activeTab === 'admin_restock_requests' && (
+                    <div className="space-y-8 max-w-5xl mx-auto">
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div>
+                          <h2 className="text-2xl font-extrabold text-white flex items-center gap-3">
+                            <span>Staff Restock Notifications Inbox</span>
+                            {pendingRestockRequestsCount > 0 && (
+                              <span className="text-xs bg-rose-500 text-white font-bold px-3 py-1 rounded-full animate-bounce">
+                                {pendingRestockRequestsCount} Stock Alerts
+                              </span>
+                            )}
+                          </h2>
+                          <p className="text-slate-400 text-sm mt-1">
+                            Library Employees audit stock and send restock requests when copies run out. Click <strong>"Approve & Restock (+5 Copies)"</strong> to fulfill.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        {restockRequests.length === 0 ? (
+                          <div className="p-12 rounded-3xl bg-slate-900/60 border border-slate-800 text-center space-y-3">
+                            <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center mx-auto">
+                              <i data-lucide="check-check" className="w-6 h-6"></i>
+                            </div>
+                            <h3 className="font-bold text-base text-white">All stock requests fulfilled!</h3>
+                            <p className="text-xs text-slate-400">When library staff request more book copies, alerts will appear here in real time.</p>
+                          </div>
+                        ) : (
+                          restockRequests.map(req => (
+                            <div
+                              key={req.id}
+                              className={`p-6 rounded-3xl bg-slate-900/90 border border-amber-900/50 flex flex-col md:flex-row md:items-center justify-between gap-6 transition-all duration-300 ${
+                                disappearingRestockId === req.id ? 'disappearing-item' : 'hover:border-amber-500/60'
+                              }`}
+                            >
+                              <div className="flex items-start gap-4 min-w-0">
+                                <div className="w-12 h-12 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
+                                  <i data-lucide="bell-ring" className="w-6 h-6 animate-pulse"></i>
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-2.5">
+                                    <h3 className="font-extrabold text-base text-white truncate">{req.bookTitle}</h3>
+                                    <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                                      +5 Copies Requested
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-slate-300 mt-1">Author: {req.author} • Category: {req.category}</p>
+                                  <div className="flex items-center gap-3 mt-2 text-xs text-slate-400">
+                                    <span>Requested by Staff: <strong className="text-amber-300 font-semibold">{req.requestedBy}</strong> ({req.empId})</span>
+                                    <span>•</span>
+                                    <span>{req.requestedAt}</span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-3 shrink-0 pt-3 md:pt-0 border-t md:border-t-0 border-slate-800">
+                                <button
+                                  onClick={() => handleAdminExecuteRestock(req)}
+                                  className="px-5 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-600/30 flex items-center gap-2 transition active:scale-95"
+                                >
+                                  <i data-lucide="plus-circle" className="w-4 h-4"></i>
+                                  <span>Approve & Restock (+5 Copies)</span>
+                                </button>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 2. ADMIN STUDENT BORROW REQUESTS */}
+                  {activeTab === 'admin_requests' && (
+                    <div className="space-y-8 max-w-5xl mx-auto">
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div>
+                          <h2 className="text-2xl font-extrabold text-white flex items-center gap-3">
+                            <span>Student Borrow Requests</span>
+                            {pendingBorrowRequestsCount > 0 && (
+                              <span className="text-xs bg-rose-500 text-white font-bold px-3 py-1 rounded-full animate-pulse">
+                                {pendingBorrowRequestsCount} Action Required
+                              </span>
+                            )}
+                          </h2>
+                          <p className="text-slate-400 text-sm mt-1">
+                            Review incoming student requests. When you click <strong>Accept</strong> or <strong>Reject</strong>, the item <strong>disappears</strong> and updates the student's status!
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        {requests.length === 0 ? (
+                          <div className="p-12 rounded-3xl bg-slate-900/60 border border-slate-800 text-center space-y-3">
+                            <div className="w-12 h-12 rounded-2xl bg-blue-500/10 text-blue-400 flex items-center justify-center mx-auto">
+                              <i data-lucide="check-check" className="w-6 h-6"></i>
+                            </div>
+                            <h3 className="font-bold text-base text-white">All caught up! No pending student requests.</h3>
+                          </div>
+                        ) : (
+                          requests.map(req => (
+                            <div
+                              key={req.id}
+                              className={`p-6 rounded-3xl bg-slate-900/80 border border-slate-800/80 flex flex-col md:flex-row md:items-center justify-between gap-6 transition-all duration-300 ${
+                                disappearingReqId === req.id ? 'disappearing-item' : 'hover:border-blue-500/50'
+                              }`}
+                            >
+                              <div className="flex items-start gap-4 min-w-0">
+                                <div className="w-12 h-12 rounded-2xl bg-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
+                                  <i data-lucide="mail" className="w-6 h-6"></i>
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-2.5">
+                                    <h3 className="font-bold text-base text-white truncate">{req.bookTitle}</h3>
+                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300">
+                                      Pending Review
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-slate-300 mt-1">Author: {req.author}</p>
+                                  <div className="flex items-center gap-3 mt-2 text-xs text-slate-400">
+                                    <span>Requested by: <strong className="text-white">{req.studentName}</strong> ({req.studentRoll})</span>
+                                    <span>•</span>
+                                    <span>{req.requestedAt}</span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-3 shrink-0 pt-3 md:pt-0 border-t md:border-t-0 border-slate-800">
+                                <button
+                                  onClick={() => handleAdminReject(req)}
+                                  className="px-4 py-2 rounded-2xl bg-slate-800 hover:bg-slate-700 text-rose-300 text-xs font-bold border border-rose-900/40 transition active:scale-95"
+                                >
+                                  Reject
+                                </button>
+                                <button
+                                  onClick={() => handleAdminApprove(req)}
+                                  className="px-5 py-2 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg shadow-emerald-600/30 flex items-center gap-1.5 transition active:scale-95"
+                                >
+                                  <i data-lucide="check" className="w-4 h-4"></i>
+                                  <span>Accept & Approve (Issue)</span>
+                                </button>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 3. ADMIN EMPLOYEE ATTENDANCE REGISTRY */}
+                  {activeTab === 'admin_emp_attendance' && (
+                    <div className="space-y-6 max-w-6xl mx-auto">
+                      <div>
+                        <h2 className="text-2xl font-extrabold text-white flex items-center gap-3">
+                          <span>Library Staff & Employee Attendance Ledger</span>
+                          <span className="text-xs bg-amber-500/20 text-amber-300 px-3 py-1 rounded-full font-bold">Admin Duty Monitor</span>
+                        </h2>
+                        <p className="text-slate-400 text-sm mt-1">
+                          Verified audit of all library staff members, duty check-in/out timestamps, and assigned shifts.
+                        </p>
+                      </div>
+
+                      <div className="rounded-3xl bg-slate-900/80 border border-slate-800/80 overflow-hidden shadow-xl">
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left text-xs">
+                            <thead className="bg-slate-950 text-slate-400 uppercase font-semibold text-[10px] tracking-wider border-b border-slate-800">
+                              <tr>
+                                <th className="p-4">Staff Name & Designation</th>
+                                <th className="p-4">Employee ID</th>
+                                <th className="p-4">Duty Status</th>
+                                <th className="p-4">Time Recorded</th>
+                                <th className="p-4">Assigned Shift</th>
+                                <th className="p-4 text-right">Date</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-800/60">
+                              {employeeAttendanceLogs.map(empLog => (
+                                <tr key={empLog.id} className="hover:bg-slate-800/40 transition">
+                                  <td className="p-4 font-bold text-white flex items-center gap-2">
+                                    <div className="w-7 h-7 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center text-[10px] font-bold">
+                                      ST
+                                    </div>
+                                    <div>
+                                      <p className="font-bold text-white">{empLog.empName}</p>
+                                      <p className="text-[10px] text-slate-400">{empLog.designation}</p>
+                                    </div>
+                                  </td>
+                                  <td className="p-4 font-mono text-indigo-300 font-semibold">{empLog.empId}</td>
+                                  <td className="p-4">
+                                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
+                                      empLog.type.includes('CHECK-IN') ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'
+                                    }`}>
+                                      {empLog.type}
+                                    </span>
+                                  </td>
+                                  <td className="p-4 font-bold text-amber-300">{empLog.time}</td>
+                                  <td className="p-4 text-slate-300">{empLog.shift}</td>
+                                  <td className="p-4 text-right text-slate-400">{empLog.date}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 4. MASTER CATALOG & RESTOCK */}
+                  {activeTab === 'admin_inventory' && (
+                    <div className="space-y-6 max-w-7xl mx-auto">
+                      <div>
+                        <h2 className="text-2xl font-extrabold text-white">Stock Management & Master Catalog</h2>
+                        <p className="text-slate-400 text-sm">Monitor stock across Education, Current Affairs, Govt Jobs & Literature.</p>
+                      </div>
+
+                      <div className="rounded-3xl bg-slate-900/80 border border-slate-800/80 overflow-hidden shadow-xl">
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left text-xs">
+                            <thead className="bg-slate-950 text-slate-400 uppercase font-semibold text-[10px] tracking-wider border-b border-slate-800">
+                              <tr>
+                                <th className="p-4">Book & Author</th>
+                                <th className="p-4">Category</th>
+                                <th className="p-4">Shelf Rack</th>
+                                <th className="p-4">Available / Total</th>
+                                <th className="p-4">Stock Status</th>
+                                <th className="p-4 text-right">Quick Restock</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-800/60">
+                              {filteredBooks.map(b => (
+                                <tr key={b.id} className="hover:bg-slate-800/40 transition">
+                                  <td className="p-4 max-w-xs">
+                                    <p className="font-bold text-white text-sm truncate">{b.title}</p>
+                                    <p className="text-slate-400 text-xs mt-0.5">{b.author}</p>
+                                  </td>
+                                  <td className="p-4">
+                                    <span className="px-2.5 py-1 rounded-full bg-slate-800 text-slate-300 text-[10px] font-semibold">
+                                      {b.category}
+                                    </span>
+                                  </td>
+                                  <td className="p-4 font-semibold text-amber-400">{b.shelf}</td>
+                                  <td className="p-4">
+                                    <span className="font-bold text-white">{b.availableCopies}</span>
+                                    <span className="text-slate-500"> / {b.copies} copies</span>
+                                  </td>
+                                  <td className="p-4">
+                                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
+                                      b.availableCopies === 0 ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30 animate-pulse' :
+                                      b.availableCopies <= 2 ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' :
+                                      'bg-emerald-500/20 text-emerald-300'
+                                    }`}>
+                                      {b.availableCopies === 0 ? 'Out of Stock' : b.availableCopies <= 2 ? 'Low Stock' : 'In Stock'}
+                                    </span>
+                                  </td>
+                                  <td className="p-4 text-right">
+                                    <button
+                                      onClick={() => handleAdminExecuteRestock({ id: 'quick-' + b.id, bookId: b.id, bookTitle: b.title, addedCopies: 5 })}
+                                      className="px-3 py-1.5 rounded-xl bg-blue-600/80 hover:bg-blue-600 text-white font-semibold text-xs transition flex items-center gap-1.5 ml-auto"
+                                    >
+                                      <i data-lucide="plus-circle" className="w-3.5 h-3.5"></i>
+                                      <span>Restock (+5)</span>
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 5. STUDENT ATTENDANCE REGISTER */}
+                  {activeTab === 'admin_attendance' && (
+                    <div className="space-y-6 max-w-6xl mx-auto">
+                      <div>
+                        <h2 className="text-2xl font-extrabold text-white">Student Gate Attendance Log</h2>
+                        <p className="text-slate-400 text-sm">Real-time attendance ledger showing Student Name, ID, and Exact Time.</p>
+                      </div>
+
+                      <div className="rounded-3xl bg-slate-900/80 border border-slate-800/80 overflow-hidden shadow-xl">
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left text-xs">
+                            <thead className="bg-slate-950 text-slate-400 uppercase font-semibold text-[10px] tracking-wider border-b border-slate-800">
+                              <tr>
+                                <th className="p-4">Student Name</th>
+                                <th className="p-4">Roll Number</th>
+                                <th className="p-4">Scan Event</th>
+                                <th className="p-4">Timestamp</th>
+                                <th className="p-4">Date</th>
+                                <th className="p-4 text-right">Status</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-800/60">
+                              {attendanceLogs.map(log => (
+                                <tr key={log.id} className="hover:bg-slate-800/40 transition">
+                                  <td className="p-4 font-bold text-white">{log.studentName}</td>
+                                  <td className="p-4 text-indigo-300 font-mono font-semibold">{log.studentRoll}</td>
+                                  <td className="p-4">
+                                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
+                                      log.type === 'CHECK-IN' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'
+                                    }`}>
+                                      {log.type === 'CHECK-IN' ? '✓ Gate Check-In' : '🚪 Gate Check-Out'}
+                                    </span>
+                                  </td>
+                                  <td className="p-4 text-amber-400 font-bold">{log.time}</td>
+                                  <td className="p-4 text-slate-400">{log.date}</td>
+                                  <td className="p-4 text-right font-semibold text-slate-300">{log.status}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 6. FINES & OVERDUE */}
+                  {activeTab === 'admin_fines' && (
+                    <div className="space-y-6 max-w-6xl mx-auto">
+                      <div>
+                        <h2 className="text-2xl font-extrabold text-white">Overdue Loans & Daily ₹20 Fine Ledger</h2>
+                        <p className="text-slate-400 text-sm">Calculated at ₹20 per day after the 2-day loan period expires.</p>
+                      </div>
+
+                      <div className="rounded-3xl bg-slate-900/80 border border-slate-800/80 overflow-hidden shadow-xl">
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left text-xs">
+                            <thead className="bg-slate-950 text-slate-400 uppercase font-semibold text-[10px] tracking-wider border-b border-slate-800">
+                              <tr>
+                                <th className="p-4">Loan ID</th>
+                                <th className="p-4">Student</th>
+                                <th className="p-4">Book Title</th>
+                                <th className="p-4">Borrow Date</th>
+                                <th className="p-4">Due Date</th>
+                                <th className="p-4">Overdue Days</th>
+                                <th className="p-4 text-right">Fine Total (₹20/Day)</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-800/60">
+                              {activeLoans.map(loan => {
+                                const { fine, overdueDays, isOverdue } = calculateFine(loan.borrowDate);
+                                return (
+                                  <tr key={loan.id} className="hover:bg-slate-800/40 transition">
+                                    <td className="p-4 font-mono text-slate-400">{loan.id}</td>
+                                    <td className="p-4 font-bold text-white">{loan.studentName} ({loan.studentRoll})</td>
+                                    <td className="p-4 text-slate-200">{loan.bookTitle}</td>
+                                    <td className="p-4 text-slate-400">{loan.borrowDate}</td>
+                                    <td className="p-4 text-amber-400 font-semibold">{loan.dueDate}</td>
+                                    <td className="p-4">
+                                      <span className={`px-2 py-0.5 rounded font-bold ${
+                                        isOverdue ? 'text-rose-400 bg-rose-950/60' : 'text-emerald-400 bg-emerald-950/60'
+                                      }`}>
+                                        {isOverdue ? `${overdueDays} Days Late` : 'On Schedule'}
+                                      </span>
+                                    </td>
+                                    <td className="p-4 text-right font-extrabold text-sm text-rose-400">
+                                      ₹{fine}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+            </main>
+          </div>
+
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>

@@ -1,0 +1,31 @@
+{
+  "name": "smart-library-management-system",
+  "version": "1.0.0",
+  "description": "Smart Library Management System with Book Recommendation, QR Borrowing and Analytics",
+  "main": "server/server.js",
+  "scripts": {
+    "server": "node server/server.js",
+    "client": "npm run dev --prefix client",
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "install-all": "npm install && npm install --prefix server && npm install --prefix client",
+    "build": "npm run build --prefix client",
+    "test": "node --test tests/*.test.js",
+    "test:coverage": "c8 node --test tests/*.test.js"
+  },
+  "keywords": [
+    "library-management",
+    "smart-library",
+    "qr-code",
+    "book-recommendation",
+    "react",
+    "node",
+    "express",
+    "mongodb"
+  ],
+  "author": "Senior Full-Stack Engineer",
+  "license": "UNLICENSED",
+  "private": true,
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
